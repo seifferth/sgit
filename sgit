@@ -37,16 +37,6 @@ Commands:
 EOF
 }
 
-gitignore() {
-    # Add all arguments to gitignore
-    #
-    test -f .gitignore || touch .gitignore
-    while test "$1"; do
-        grep -q "$1" .gitignore || echo "$1" >> .gitignore
-        shift
-    done
-}
-
 save() {
     # Arguments:
     #   $@: (optional) commit message
@@ -63,7 +53,6 @@ save() {
         echo "\"sgit checkout latest\" before you can save new versions again." >&2
         exit 1
     fi
-    gitignore .gitignore
     while true; do      # cd to git root
         test -d .git && break || cd ..
     done
@@ -121,8 +110,8 @@ checkout() {
             echo "a non-existing directory to save the old version to." >&2
             exit 1
         fi
-        gitignore "$2"
         git checkout-index -af --prefix="$2/"
+        echo '*' >> "$2/.gitignore"
     else
         if test "$(git status -s)"; then
             echo "There are unsaved changes. Run \"sgit save\" first." >&2
@@ -147,7 +136,6 @@ elif test "$1" = "checkout"; then
 elif test "$1" = "push"; then
     git push
 elif test "$1" = "init"; then
-    gitignore .gitignore
     git init
 else
     help

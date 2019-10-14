@@ -21,6 +21,36 @@ versions of files in subdirectories, rather than revert commits or merge
 different branches. `sgit` is intended to ease the use of git in that
 sort of workflow.
 
+## Usage
+
+```
+Usage: sgit <command> [options]
+
+Commands:
+    init    Initialize a new version control repository.
+
+    save [subject]
+            Add the current version to version control. Optionally
+            include a subject to describe the changes.
+
+    log     Show version history.
+
+    push    Synchronize local revision history to remote copy. This
+            can be used as a backup mechanism. An upstream has to be
+            configured first for this command to work.
+
+    checkout <version> [dir]
+            Load a previous version. If "dir" is specified, the old
+            version will be saved to that directory, rather than
+            the main directory. If "dir" is omitted, the specified
+            version will be saved to the main directory.
+            You can always return to the most recent version using
+            "sgit checkout latest".
+
+    help    Print this help message and exit.
+
+```
+
 ## Installing
 
 `sgit` is a standalone, POSIX-compliant shell script. Simply adding

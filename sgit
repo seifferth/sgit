@@ -1,0 +1,155 @@
+#!/bin/sh
+#
+# SPDX-License-Identifier: GPL-3.0+
+#
+# A wrapper around git, optimized for writing projects rather than
+# for code. sgit uses date and time to reference commits, rather than
+# commit ids. It also wraps adding and committing into a single `save`
+# command and defaults to empty commit messages.
+
+help() {
+cat <<EOF
+Usage: sgit <command> [options]
+
+Commands:
+    init    Initialize a new version control repository.
+
+    save [subject]
+            Add the current version to version control. Optionally
+            include a subject to describe the changes.
+
+    log     Show version history.
+
+    push    Synchronize local revision history to remote copy. This
+            can be used as a backup mechanism. An upstream has to be
+            configured first for this command to work.
+
+    checkout <version> [dir]
+            Load a previous version. If "dir" is specified, the old
+            version will be saved to that directory, rather than
+            the main directory. If "dir" is omitted, the specified
+            version will be saved to the main directory.
+            You can always return to the most recent version using
+            "sgit checkout latest".
+
+    help    Print this help message and exit.
+
+EOF
+}
+
+gitignore() {
+    # Add all arguments to gitignore
+    #
+    test -f .gitignore || touch .gitignore
+    while test "$1"; do
+        grep -q "$1" .gitignore || echo "$1" >> .gitignore
+        shift
+    done
+}
+
+save() {
+    # Arguments:
+    #   $@: (optional) commit message
+    #
+    if ! git status 1>/dev/null 2>&1; then
+        echo "There is no git repository for tracking this directory yet." >&2
+        echo "Run \"sgit init\" to create a new repository." >&2
+        exit 1
+    elif test "$(git rev-list --count --all)" = 0; then
+        # No commits yet -> do nothing
+        echo >/dev/null
+    elif ! test "$(git log --format='%D' -n1 | grep master)"; then
+        echo "You are currently reviewing an old version. You need to run" >&2
+        echo "\"sgit checkout latest\" before you can save new versions again." >&2
+        exit 1
+    fi
+    gitignore .gitignore
+    while true; do      # cd to git root
+        test -d .git && break || cd ..
+    done
+    git add .
+    if test "$#" = 0; then
+        git commit --allow-empty-message --no-edit
+    else
+        git commit -m "$@"
+    fi
+}
+
+log() {
+    # Arguments:
+    #   $@: (optional) what to include after date
+    #
+    if test "$(git rev-list --count --all)" = 0; then
+        echo "No version has been saved yet." >&2
+        exit 1
+    fi
+    git log --date=format:'%F_%H:%M' --format="%ad   $@" master
+}
+
+checkout() {
+    # Arguments:
+    #   $1: which version to check out -- use "latest" to
+    #       check out the latest version
+    #   $2: (optional) where to save the old version
+    #
+    if test "$1" = "master" || test "$1" = "latest"; then
+        ref="master"
+    else
+        matches=$(log | grep "^$1" | wc -l)
+        if test $matches -lt 1; then
+            echo "No version found for $1" >&2
+            exit 1
+        elif test $matches -gt 1; then
+            echo "Multiple versions found for \"$1\"." >&2
+            echo "Please specify in more detail." >&2
+            log | grep "^$1" >&2
+            exit 1
+        else    # exactly one match
+            ref="$(log '%H' | grep "^$1" | sed 's,.* ,,g')"
+            if test "$ref" = "$(log '%H' | head -n1 | sed 's,.* ,,g')"; then
+                ref="master"    # Don't detach head when checking out master
+            fi
+        fi
+    fi
+    if test "$2"; then
+        test -e "$2" || mkdir "$2"
+        if ! test -d "$2"; then
+            echo "\"$2\" is not a directory." >&2
+            exit 1
+        elif test "$(ls -A "$2")"; then
+            echo "Directory \"$2\" is not empty. Please specify an empty or" >&2
+            echo "a non-existing directory to save the old version to." >&2
+            exit 1
+        fi
+        gitignore "$2"
+        git checkout-index -af --prefix="$2/"
+    else
+        if test "$(git status -s)"; then
+            echo "There are unsaved changes. Run \"sgit save\" first." >&2
+            exit 1
+        fi
+        git checkout -q "$ref"
+    fi
+}
+
+
+if test "$1" = "help" || test "$1" = "-h" || test "$1" = "--help"; then
+    help
+    exit 0
+elif test "$1" = "save"; then
+    shift
+    save $@
+elif test "$1" = "log"; then
+    log "%s"
+elif test "$1" = "checkout"; then
+    shift
+    checkout "$1" "$2"
+elif test "$1" = "push"; then
+    git push
+elif test "$1" = "init"; then
+    gitignore .gitignore
+    git init
+else
+    help
+    exit 1
+fi

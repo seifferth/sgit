@@ -110,7 +110,9 @@ checkout() {
             echo "a non-existing directory to save the old version to." >&2
             exit 1
         fi
-        git checkout-index -af --prefix="$2/"
+        git checkout -q "$ref"
+        git checkout-index -a --prefix="$2/"
+        git checkout -q "master"
         echo '*' >> "$2/.gitignore"
     else
         if test "$(git status -s)"; then

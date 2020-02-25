@@ -60,7 +60,7 @@ save() {
     if test "$#" = 0; then
         git commit --allow-empty-message --no-edit
     else
-        git commit -m "$@"
+        echo $@ | git commit -F -
     fi
 }
 
